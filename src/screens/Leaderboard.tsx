@@ -1,136 +1,94 @@
 import { useEffect, useState } from 'react'
 import { Card } from '../components/ui'
-import { getUser } from '../lib/db'
+import { getUser, supabase } from '../lib/db'
 import { getLevel } from '../lib/scoring'
-import {
-  loadLeaderboard,
-  loadPermissions,
-  setProfileVisibility,
-  LeaderRow,
-} from '../lib/data'
-import type { Period } from '../types'
 
-const PERIODS: Period[] = ['Weekly', 'Monthly', 'All-time']
+type Row = { id: string; display_name: string | null; stars: number }
 
 export default function Leaderboard() {
-  const [period, setPeriod] = useState<Period>('All-time')
-  const [rows, setRows] = useState<LeaderRow[]>([])
+  const [rows, setRows] = useState<Row[]>([])
+  const [myId, setMyId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [userId, setUserId] = useState<string | null>(null)
-  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    (async () => {
-      const user = await getUser()
-      if (!user) return
-      setUserId(user.id)
+    let cancelled = false
+    ;(async () => {
       try {
-        const p = await loadPermissions(user.id)
-        setVisible(p.profileVisibility)
-      } catch {
-        // Default to private if the setting can't be read
+        const user = await getUser()
+        if (!cancelled) setMyId(user?.id ?? null)
+
+        const { data, error: qErr } = await supabase
+          .from('profiles')
+          .select('id, display_name, stars')
+          .eq('profile_visible', true)
+          .order('stars', { ascending: false })
+          .limit(50)
+        if (qErr) throw qErr
+        if (!cancelled) setRows((data as Row[]) || [])
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Could not load the leaderboard.')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     })()
+    return () => { cancelled = true }
   }, [])
 
-  useEffect(() => {
-    setLoading(true)
-    setError('')
-    loadLeaderboard(period)
-      .then(setRows)
-      .catch(e => setError(e.message || 'Could not load the leaderboard'))
-      .finally(() => setLoading(false))
-  }, [period])
-
-  const toggleVisibility = async () => {
-    if (!userId) return
-    const next = !visible
-    setVisible(next)
-    try {
-      await setProfileVisibility(userId, next)
-      setRows(await loadLeaderboard(period))
-    } catch (e: any) {
-      setVisible(!next)
-      setError(e.message || 'Could not update your privacy setting')
-    }
-  }
+  const nameOf = (r: Row, i: number) =>
+    r.display_name?.trim() || `Thinker ${i + 1}`
 
   return (
     <div>
       <div className="hero">
         <span className="tag">Rankings</span>
         <h1 style={{ marginTop: 12 }}>Leaderboard</h1>
-        <p className="muted">Stars reward thinking first, not speed.</p>
+        <p className="muted">Stars reward thinking first, not speed. Only public profiles appear here.</p>
       </div>
-
-      <div className="segmented" role="tablist">
-        {PERIODS.map(p => (
-          <button
-            key={p}
-            type="button"
-            role="tab"
-            aria-selected={period === p}
-            className={period === p ? 'seg active' : 'seg'}
-            onClick={() => setPeriod(p)}
-          >
-            {p}
-          </button>
-        ))}
-      </div>
-
-      {error ? <p className="error-text">{error}</p> : null}
 
       <Card>
-        <div className="table-head">
-          <span className="rank">#</span>
-          <span style={{ flex: 1, marginLeft: 12 }}>Student</span>
-          <span className="stars">Stars</span>
-          <span className="level-col">Level</span>
-        </div>
-
         {loading ? (
-          <p className="muted" style={{ padding: 14 }}>Loading…</p>
+          <p className="muted">Loading...</p>
+        ) : error ? (
+          <p className="error-text">{error}</p>
         ) : rows.length === 0 ? (
-          <p className="muted" style={{ padding: 14 }}>
-            No public profiles yet. Turn on your profile below to appear here.
+          <p className="muted">
+            No public profiles yet. Sign in, open Profile, and tap "Show my profile on leaderboard" to appear here.
           </p>
         ) : (
-          rows.map((r, i) => (
-            <div key={r.user_id} className={`table-row ${r.is_me ? 'me' : ''}`}>
-              <span className="rank">{i + 1}</span>
-              <span style={{ flex: 1, marginLeft: 12, fontWeight: r.is_me ? 700 : 500 }}>
-                {r.is_me ? 'You' : r.display_name}
-              </span>
-              <span className="stars">{r.total_stars} ★</span>
-              <span className="level-col muted">{getLevel(r.total_stars).level}</span>
+          <div>
+            <div className="perm-row" style={{ fontWeight: 700, color: 'var(--primary-dark)' }}>
+              <span style={{ width: 40 }}>#</span>
+              <span style={{ flex: 1 }}>Student</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Stars</span>
+              <span style={{ width: 170, textAlign: 'right' }}>Level</span>
             </div>
-          ))
+            {rows.map((r, i) => {
+              const isMe = r.id === myId
+              return (
+                <div
+                  key={r.id}
+                  className="perm-row"
+                  style={{ background: isMe ? '#f0fdfa' : 'transparent', borderRadius: 8 }}
+                >
+                  <span style={{ width: 40 }}>{i + 1}</span>
+                  <span style={{ flex: 1, fontWeight: isMe ? 700 : 400 }}>
+                    {nameOf(r, i)}{isMe ? ' (you)' : ''}
+                  </span>
+                  <span style={{ width: 90, textAlign: 'right' }}>{r.stars} ★</span>
+                  <span style={{ width: 170, textAlign: 'right' }}>{getLevel(r.stars).level}</span>
+                </div>
+              )
+            })}
+          </div>
         )}
       </Card>
 
-      {userId ? (
-        <Card title="Privacy">
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <span>Show my name on the leaderboard</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={visible}
-              aria-label="Show my name on the leaderboard"
-              className={`toggle ${visible ? 'on' : ''}`}
-              onClick={toggleVisibility}
-            >
-              <span className="toggle-knob" />
-            </button>
-          </div>
-          <p className="muted" style={{ marginTop: 8 }}>
-            Your rank stays private unless you turn this on.
-          </p>
-        </Card>
-      ) : (
-        <p className="muted" style={{ marginTop: 12 }}>Sign in to appear on the leaderboard.</p>
-      )}
+      <Card>
+        <p className="muted">
+          Guests can view this board. Sign in to appear on it.
+        </p>
+      </Card>
     </div>
   )
 }

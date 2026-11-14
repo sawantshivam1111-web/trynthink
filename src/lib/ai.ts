@@ -18,7 +18,7 @@ export interface MethodInfo {
 
 export const HINT_LADDER = ["What do you think the first step is?", "Can you explain your reasoning so far?"]
 
-export type AIMode = 'tutor' | 'method' | 'feedback' | 'quiz' | 'flashcards' | 'grade'
+export type AIMode = 'tutor' | 'method' | 'feedback' | 'quiz' | 'flashcards' | 'grade' | 'onboard' | 'profile'
 export type AIResult = { ok: boolean; text: string; error: string }
 export type Material = { fileName: string; content: string }
 
@@ -104,3 +104,4 @@ export function parseJSON<T>(text: string): T | null {
     return null
   }
 }
+
