@@ -1,0 +1,10 @@
+{
+  "name": "TryNThink",
+  "short_name": "TryNThink",
+  "description": "Think independently. Learn confidently.",
+  "start_url": "/home",
+  "display": "standalone",
+  "background_color": "#f4f8f7",
+  "theme_color": "#0f9d8a",
+  "orientation": "portrait-primary"
+}
