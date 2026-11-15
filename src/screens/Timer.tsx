@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { Card, Button } from '../components/ui'
+import { getUser, supabase } from '../lib/db'
 
 const PRESETS = [5, 10, 15, 20, 45, 60]
 const AI_APPS = ['ChatGPT', 'Gemini', 'Claude', 'Copilot', 'Perplexity', 'Other AI apps']
 
 export default function Timer() {
-  const [minutes, setMinutes] = useState(25)
+  const [plannedMinutes, setPlannedMinutes] = useState(25)
   const [customInput, setCustomInput] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [running, setRunning] = useState(false)
   const [blockedApps, setBlockedApps] = useState<string[]>(['ChatGPT', 'Gemini', 'Claude'])
   const [error, setError] = useState('')
-  const intervalRef = useRef<number | null>(null)
+  const [savedMessage, setSavedMessage] = useState('')
+  const startedAtRef = useRef<number | null>(null)
+  const savedRef = useRef(false)
 
   useEffect(() => {
     if (!running) return
-    intervalRef.current = window.setInterval(() => {
+    const id = window.setInterval(() => {
       setSecondsLeft(s => {
         if (s <= 1) {
           setRunning(false)
@@ -24,26 +27,51 @@ export default function Timer() {
         return s - 1
       })
     }, 1000)
-    return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current)
+    return () => window.clearInterval(id)
+  }, [running])
+
+  // When the timer ends (by countdown or by stopping), save the focus session once.
+  useEffect(() => {
+    if (!running && startedAtRef.current !== null && !savedRef.current) {
+      savedRef.current = true
+      const elapsedMinutes = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 60000))
+      startedAtRef.current = null
+      saveSession(elapsedMinutes)
     }
   }, [running])
 
+  const saveSession = async (minutes: number) => {
+    try {
+      const user = await getUser()
+      if (!user) {
+        setSavedMessage('Focus session finished. Sign in to save it to your progress.')
+        return
+      }
+      const { error: iErr } = await supabase
+        .from('sessions')
+        .insert({ user_id: user.id, type: 'timer', duration: minutes })
+      if (iErr) throw iErr
+      setSavedMessage(`Focus session saved: ${minutes} minute${minutes === 1 ? '' : 's'}.`)
+    } catch (e: any) {
+      setError(`Could not save the session: ${e?.message || 'unknown error'}`)
+    }
+  }
+
   const start = (mins: number) => {
     setError('')
+    setSavedMessage('')
     if (!Number.isFinite(mins) || mins < 1 || mins > 240) {
       setError('Choose between 1 and 240 minutes.')
       return
     }
-    setMinutes(mins)
+    setPlannedMinutes(mins)
     setSecondsLeft(mins * 60)
+    startedAtRef.current = Date.now()
+    savedRef.current = false
     setRunning(true)
   }
 
-  const startCustom = () => {
-    const n = Number(customInput)
-    start(n)
-  }
+  const startCustom = () => start(Number(customInput))
 
   const stop = () => {
     setRunning(false)
@@ -60,11 +88,10 @@ export default function Timer() {
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
   }
 
-  // Focus screen while the timer runs
-  if (running || (secondsLeft === 0 && minutes && intervalRef.current && !running && secondsLeft === 0 && false)) {
+  if (running) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 40 }}>
-        <span className="tag">Focus time</span>
+        <span className="tag">Focus time · {plannedMinutes} min</span>
         <h1 style={{ fontSize: 72, marginTop: 16 }}>{fmt(secondsLeft)}</h1>
         <p className="muted">Think first. Stay with your own reasoning.</p>
 
@@ -89,25 +116,20 @@ export default function Timer() {
     )
   }
 
-  // Session finished
-  if (!running && secondsLeft === 0 && minutes && intervalRef.current) {
-    // handled below by the setup screen, which shows a completion message
-  }
-
   return (
     <div>
       <div className="hero">
         <span className="tag">Focus timer</span>
         <h1 style={{ marginTop: 12 }}>Set your focus time</h1>
-        <p className="muted">Pick a length. The app will show a focus screen while the timer runs.</p>
+        <p className="muted">Pick a length. Each finished session is saved to your progress report.</p>
       </div>
+
+      {savedMessage ? <p style={{ color: 'var(--primary-dark)', marginBottom: 12 }}>{savedMessage}</p> : null}
 
       <Card title="Duration">
         <div className="row-wrap" style={{ marginBottom: 12 }}>
           {PRESETS.map(m => (
-            <Button key={m} variant="secondary" onClick={() => start(m)}>
-              {m} min
-            </Button>
+            <Button key={m} variant="secondary" onClick={() => start(m)}>{m} min</Button>
           ))}
         </div>
 
@@ -119,27 +141,22 @@ export default function Timer() {
             placeholder="Custom minutes"
             value={customInput}
             onChange={e => setCustomInput(e.target.value)}
-            style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border, #ccc)', width: 160 }}
+            style={{ padding: 10, borderRadius: 8, border: '1px solid #ccc', width: 160 }}
           />
           <Button onClick={startCustom}>Start custom</Button>
         </div>
 
-        {error ? <p className="error-text">{error}</p> : null}
+        {error ? <p className="error-text" style={{ marginTop: 10 }}>{error}</p> : null}
       </Card>
 
       <Card title="Apps to block during focus (prototype)">
         <p className="muted" style={{ marginBottom: 12 }}>
-          Choose which AI apps you want blocked. This is a demo. It shows what the lock would
-          look like. Real blocking is added in the Android version.
+          Choose which AI apps you want blocked. This is a demo. Real blocking is added in the Android version.
         </p>
         {AI_APPS.map(app => (
           <label key={app} className="perm-row" style={{ cursor: 'pointer' }}>
             <span>{app}</span>
-            <input
-              type="checkbox"
-              checked={blockedApps.includes(app)}
-              onChange={() => toggleBlock(app)}
-            />
+            <input type="checkbox" checked={blockedApps.includes(app)} onChange={() => toggleBlock(app)} />
           </label>
         ))}
       </Card>
