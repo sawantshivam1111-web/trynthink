@@ -794,3 +794,34 @@ body {
 .nav a.active { background: var(--theme-accent-soft, #e6f6ef) !important; color: var(--theme-primary-dark, #0b7a6b) !important; }
 .score, .cert-level, .card-title, .timer, .rank, .stars { color: var(--theme-primary-dark, #0b7a6b) !important; }
 .seg.active { background: var(--theme-primary, #0f9d8a) !important; }
+
+/* Contrast fix: text and cards always contrast with the active background */
+:root { --theme-is-dark: 0; }
+html[data-theme-dark="1"] {
+  --theme-is-dark: 1;
+}
+html[data-theme-dark="1"] .card,
+html[data-theme-dark="1"] .pill-row,
+html[data-theme-dark="1"] .kpi .pill,
+html[data-theme-dark="1"] .settings-row,
+html[data-theme-dark="1"] .segmented,
+html[data-theme-dark="1"] .input,
+html[data-theme-dark="1"] .select {
+  background: #15151d !important;
+  color: #f8f5ee !important;
+  border-color: #2a2a35 !important;
+}
+html[data-theme-dark="1"] .muted,
+html[data-theme-dark="1"] .card p,
+html[data-theme-dark="1"] .card span,
+html[data-theme-dark="1"] .card div,
+html[data-theme-dark="1"] h1,
+html[data-theme-dark="1"] h2,
+html[data-theme-dark="1"] h3 {
+  color: #f8f5ee !important;
+}
+html[data-theme-dark="1"] .muted { color: #b7b3a8 !important; }
+html[data-theme-dark="1"] .card-title { color: var(--theme-primary, #f0b429) !important; }
+html[data-theme-dark="1"] .nav { background: #0a0a0f !important; border-color: #2a2a35 !important; }
+html[data-theme-dark="1"] .nav a { color: #b7b3a8 !important; }
+html[data-theme-dark="1"] .nav a.active { color: #f0b429 !important; background: #1d1d26 !important; }

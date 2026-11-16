@@ -1,4 +1,5 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import OnboardingGate from './components/OnboardingGate'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Auth from './screens/Auth'
 import ForgotPassword from './screens/ForgotPassword'
 import Permissions from './screens/Permissions'
@@ -23,6 +24,7 @@ import Layout from './components/layout'
 export default function App() {
   return (
     <BrowserRouter>
+      <OnboardingGate />
       <Routes>
         <Route path="/" element={<Navigate to="/auth" replace />} />
 

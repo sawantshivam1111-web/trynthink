@@ -1,23 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Card, Button } from '../components/ui'
 import { getUser, supabase } from '../lib/db'
-import {
-  isNative,
-  nativeFocusReady,
-  openNativeFocusSettings,
-  startNativeFocus,
-  stopNativeFocus,
-} from '../lib/focus'
 
 const PRESETS = [5, 10, 15, 20, 45, 60]
-const AI_APPS = ['ChatGPT', 'Gemini', 'Claude', 'Copilot', 'Perplexity']
 
 export default function Timer() {
   const [plannedMinutes, setPlannedMinutes] = useState(25)
   const [customInput, setCustomInput] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [running, setRunning] = useState(false)
-  const [blockedApps, setBlockedApps] = useState<string[]>(['ChatGPT', 'Gemini', 'Claude'])
   const [error, setError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
   const startedAtRef = useRef<number | null>(null)
@@ -36,12 +27,10 @@ export default function Timer() {
     return () => window.clearInterval(id)
   }, [running])
 
-  // When the session ends (countdown or stop), unblock apps and save the session once.
   useEffect(() => {
     if (running || startedAtRef.current === null) return
     const minutes = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 60000))
     startedAtRef.current = null
-    stopNativeFocus()
     saveSession(minutes)
   }, [running])
 
@@ -62,41 +51,22 @@ export default function Timer() {
     }
   }
 
-  const start = async (mins: number) => {
+  const start = (mins: number) => {
     setError('')
     setSavedMessage('')
     if (!Number.isFinite(mins) || mins < 1 || mins > 240) {
       setError('Choose between 1 and 240 minutes.')
       return
     }
-    if (isNative()) {
-      const ready = await nativeFocusReady()
-      if (!ready) {
-        await openNativeFocusSettings()
-        setError('Turn on TryNThink under Accessibility, then tap the duration again.')
-        return
-      }
-    }
     setPlannedMinutes(mins)
     setSecondsLeft(mins * 60)
     startedAtRef.current = Date.now()
     setRunning(true)
-    if (isNative()) {
-      try {
-        await startNativeFocus(mins, blockedApps)
-      } catch (e: any) {
-        setError(`Could not start blocking: ${e?.message || 'unknown error'}`)
-      }
-    }
   }
 
   const stop = () => {
     setRunning(false)
     setSecondsLeft(0)
-  }
-
-  const toggleBlock = (app: string) => {
-    setBlockedApps(prev => (prev.includes(app) ? prev.filter(a => a !== app) : [...prev, app]))
   }
 
   const fmt = (s: number) => {
@@ -110,18 +80,7 @@ export default function Timer() {
       <div style={{ textAlign: 'center', paddingTop: 40 }}>
         <span className="tag">Focus time · {plannedMinutes} min</span>
         <h1 style={{ fontSize: 72, marginTop: 16 }}>{fmt(secondsLeft)}</h1>
-        <p className="muted">Think first. Blocked apps are sent back during this session.</p>
-
-        <Card title="Blocked during this session">
-          {blockedApps.map(app => (
-            <div key={app} className="perm-row">
-              <span>{app}</span>
-              <span className="muted">🔒 blocked</span>
-            </div>
-          ))}
-          {blockedApps.length === 0 ? <p className="muted">No apps selected.</p> : null}
-        </Card>
-
+        <p className="muted">Think first. Stay with the problem before you reach for help.</p>
         <div style={{ marginTop: 20 }}>
           <Button variant="ghost" onClick={stop}>End focus session</Button>
         </div>
@@ -134,7 +93,7 @@ export default function Timer() {
       <div className="hero">
         <span className="tag">Focus timer</span>
         <h1 style={{ marginTop: 12 }}>Set your focus time</h1>
-        <p className="muted">Pick a length. Blocked apps are sent back to TryNThink until the timer ends.</p>
+        <p className="muted">Pick a length and study without interruptions.</p>
       </div>
 
       {savedMessage ? <p style={{ color: 'var(--primary-dark)', marginBottom: 12 }}>{savedMessage}</p> : null}
@@ -160,18 +119,6 @@ export default function Timer() {
         </div>
 
         {error ? <p className="error-text" style={{ marginTop: 10 }}>{error}</p> : null}
-      </Card>
-
-      <Card title="Apps to block during focus">
-        <p className="muted" style={{ marginBottom: 12 }}>
-          Choose which AI apps to block. The first time, Android asks you to turn on TryNThink under Accessibility.
-        </p>
-        {AI_APPS.map(app => (
-          <label key={app} className="perm-row" style={{ cursor: 'pointer' }}>
-            <span>{app}</span>
-            <input type="checkbox" checked={blockedApps.includes(app)} onChange={() => toggleBlock(app)} />
-          </label>
-        ))}
       </Card>
     </div>
   )
