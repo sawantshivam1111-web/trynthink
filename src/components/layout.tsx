@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import OfflineBanner from './OfflineBanner'
+import '../lib/themeEngine'
 
 const WIDTH = 240
 const WIDE = 768

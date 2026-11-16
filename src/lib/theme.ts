@@ -1,1 +1,20 @@
-﻿export const THEMES = [{ id: 'green', name: 'Green', primary: '#10b981', dark: '#0f766e' }, { id: 'blue', name: 'Blue', primary: '#3b82f6', dark: '#1d4ed8' }, { id: 'purple', name: 'Purple', primary: '#8b5cf6', dark: '#6d28d9' }, { id: 'orange', name: 'Orange', primary: '#f97316', dark: '#c2410c' }]; const KEY = 'trynthink-theme'; export function getThemeId(): string { return localStorage.getItem(KEY) || 'green' }; export function applyTheme(id: string) { const t = THEMES.find(x => x.id === id) || THEMES[0]; const root = document.documentElement.style; root.setProperty('--primary', t.primary); root.setProperty('--primary-dark', t.dark); localStorage.setItem(KEY, t.id) }
+import { PRESETS, DEFAULT_ID } from './themePresets'
+import { applyPreset, applyStyle, getActiveId, getCustom, presetById } from './themeEngine'
+
+// Kept for the existing Home screen colour buttons.
+export const THEMES = PRESETS.map(p => ({ id: p.id, name: p.name, primary: p.primary, dark: p.primaryDark }))
+
+export function getThemeId(): string {
+  return getActiveId()
+}
+
+export function applyTheme(id: string) {
+  if (id === 'custom') {
+    const c = getCustom()
+    if (c) applyStyle(c)
+    return
+  }
+  applyPreset(id || DEFAULT_ID)
+}
+
+export { presetById }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Button } from '../components/ui'
+import ThemeStudio from '../components/ThemeStudio'
 import { getLevel } from '../lib/scoring'
 import { getUser, supabase, signOut } from '../lib/db'
 
@@ -58,7 +59,6 @@ export default function Profile() {
         setUserId(user.id)
         setEmail(user.email || null)
 
-        // Load the profile row. If it doesn't exist yet, create it.
         let { data: profile, error: pErr } = await supabase
           .from('profiles')
           .select('stars, profile_visible')
@@ -138,6 +138,7 @@ export default function Profile() {
           <p className="muted" style={{ marginBottom: 12 }}>Stars on this device: {stars} ★</p>
           <Button onClick={() => nav('/auth')}>Sign in</Button>
         </Card>
+        <ThemeStudio />
       </div>
     )
   }
@@ -206,6 +207,8 @@ export default function Profile() {
           </p>
         )}
       </Card>
+
+      <ThemeStudio />
 
       <Card title="Account">
         <div className="row-wrap">
