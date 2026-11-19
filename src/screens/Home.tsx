@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react'
+import { HogwartsHome, useHogwarts } from '../hogwarts/Hogwarts'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button } from '../components/ui'
 import { getLevel } from '../lib/scoring'
@@ -7,6 +8,7 @@ import { getUser, supabase } from '../lib/db'
 import { calcDependency } from '../lib/dependency'
 
 export default function Home() {
+  const hogwarts = useHogwarts()
   const [stars, setStars] = useState(Number(localStorage.getItem('stars') || '0'))
   const [email, setEmail] = useState<string | null>(null)
   const [dep, setDep] = useState({ independent: 0, assisted: 0, dependent: 0 })
@@ -43,6 +45,8 @@ export default function Home() {
       }
     })()
   }, [])
+
+  if (hogwarts.enabled) return <HogwartsHome email={email} stars={stars} dep={dep} />
 
   return (
     <div>

@@ -1,3 +1,4 @@
+import HogwartsWorld from './hogwarts/Hogwarts'
 import OnboardingGate from './components/OnboardingGate'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Auth from './screens/Auth'
@@ -24,6 +25,7 @@ import Layout from './components/layout'
 export default function App() {
   return (
     <BrowserRouter>
+      <HogwartsWorld>
       <OnboardingGate />
       <Routes>
         <Route path="/" element={<Navigate to="/auth" replace />} />
@@ -53,6 +55,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
+    </HogwartsWorld>
     </BrowserRouter>
   )
 }
