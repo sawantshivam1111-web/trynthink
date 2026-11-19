@@ -1,7 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Card, Button, Input } from '../components/ui'
 import { signIn, signUp } from '../lib/db'
+
+function friendly(message: string) {
+  const m = message.toLowerCase()
+  if (m.includes('security purposes') || m.includes('rate limit') || m.includes('too many')) {
+    return 'Too many attempts right now. Please wait a moment.'
+  }
+  if (m.includes('already registered') || m.includes('already been registered')) {
+    return 'This email already has an account. Log in instead.'
+  }
+  if (m.includes('invalid login')) return 'Email or password is incorrect.'
+  if (m.includes('email not confirmed')) return 'Please confirm your email first. Check your inbox.'
+  return message
+}
 
 export default function Auth() {
   const [email, setEmail] = useState('')
@@ -9,27 +22,52 @@ export default function Auth() {
   const [mode, setMode] = useState<'login' | 'signup'>('signup')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [cooldown, setCooldown] = useState(0)
   const nav = useNavigate()
 
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const id = window.setInterval(() => setCooldown(c => (c > 0 ? c - 1 : 0)), 1000)
+    return () => window.clearInterval(id)
+  }, [cooldown])
+
   const submit = async () => {
+    if (loading || cooldown > 0) return
     setError('')
-    if (!email || !password) {
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail || !password) {
       setError('Please enter email and password')
+      return
+    }
+    if (mode === 'signup' && password.length < 6) {
+      setError('Password must be at least 6 characters.')
       return
     }
     setLoading(true)
     try {
       const res = mode === 'signup'
-        ? await signUp(email, password)
-        : await signIn(email, password)
-      if (res.error) setError(res.error.message)
-      else nav('/permissions')
+        ? await signUp(cleanEmail, password)
+        : await signIn(cleanEmail, password)
+      if (res.error) {
+        const wait = res.error.message.match(/(\d+)\s*seconds?/i)
+        if (wait) setCooldown(Number(wait[1]))
+        setError(friendly(res.error.message))
+      } else {
+        nav('/permissions')
+      }
     } catch (e: any) {
-      setError(e.message || 'Authentication failed')
+      setError(friendly(e?.message || 'Something went wrong. Please try again.'))
     } finally {
       setLoading(false)
     }
   }
+
+  const busy = loading || cooldown > 0
+  const buttonLabel = loading
+    ? 'Please wait...'
+    : cooldown > 0
+      ? `Try again in ${cooldown}s`
+      : mode === 'signup' ? 'Create Account' : 'Log In'
 
   return (
     <div className="auth-wrap">
@@ -65,9 +103,7 @@ export default function Auth() {
         {error ? <p className="error-text">{error}</p> : null}
 
         <div className="row-wrap" style={{ marginTop: 16 }}>
-          <Button onClick={submit} disabled={loading}>
-            {loading ? 'Please wait...' : mode === 'signup' ? 'Create Account' : 'Log In'}
-          </Button>
+          <Button onClick={submit} disabled={busy}>{buttonLabel}</Button>
           <Button variant="secondary" onClick={() => nav('/permissions')}>
             Continue as Guest
           </Button>
