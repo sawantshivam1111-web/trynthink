@@ -48,7 +48,7 @@ export default function Leaderboard() {
 
       <Card>
         {loading ? (
-          <p className="muted">Loading...</p>
+          <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
         ) : error ? (
           <p className="error-text">{error}</p>
         ) : rows.length === 0 ? (

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, Button, TextArea } from '../components/ui'
 import { callAI, loadMaterial, parseJSON, Material } from '../lib/ai'
 import { getUser, supabase } from '../lib/db'
@@ -139,7 +139,7 @@ export default function Test() {
       </div>
 
       {loadingMaterial ? (
-        <Card><p className="muted">Loading your material...</p></Card>
+        <Card><p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p></Card>
       ) : (
         <Card title="Source">
           {material && useUploaded ? (

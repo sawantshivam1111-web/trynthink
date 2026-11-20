@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, Button, TextArea } from '../components/ui'
 import { callTutor, Message } from '../lib/ai'
 import { getUser, supabase } from '../lib/db'
@@ -52,7 +52,7 @@ Student: ${text}`
     setBusy(false)
   }
 
-  if (loading) return <p className="muted">Loading...</p>
+  if (loading) return <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
 
   if (!fileName) {
     return (

@@ -138,7 +138,7 @@ export default function Community() {
 
       <Card title="Latest">
         {loading ? (
-          <p className="muted">Loading posts...</p>
+          <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
         ) : posts.length === 0 ? (
           <p className="muted">No posts yet. Be the first to share a thought.</p>
         ) : (

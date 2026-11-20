@@ -162,7 +162,7 @@ Write the thinking pattern report as the JSON described. Mention focus time only
     }
   }
 
-  if (loading) return <p className="muted">Loading your progress...</p>
+  if (loading) return <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
 
   if (!signedIn) {
     return (

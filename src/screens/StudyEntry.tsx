@@ -1,10 +1,10 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button } from '../components/ui'
 import { getUser, supabase } from '../lib/db'
 import { extractText } from '../lib/extract'
 
-const MAX_MB = 10
+const MAX_MB = 20
 const ALLOWED = ['.pdf', '.docx', '.txt']
 
 export default function StudyEntry() {

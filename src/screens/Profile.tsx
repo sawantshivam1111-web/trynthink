@@ -124,7 +124,7 @@ export default function Profile() {
     nav('/auth')
   }
 
-  if (loading) return <p className="muted">Loading your profile...</p>
+  if (loading) return <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
 
   if (isGuest) {
     return (
