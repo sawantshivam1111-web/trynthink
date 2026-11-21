@@ -2,17 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Button } from '../components/ui'
 import ThemeStudio from '../components/ThemeStudio'
-import { getLevel } from '../lib/scoring'
+import { levelInfo } from '../lib/levels'
 import { getUser, supabase, signOut } from '../lib/db'
-
-function buildLadder(): string[] {
-  const names: string[] = []
-  for (let s = 0; s <= 5000; s += 5) {
-    const n = getLevel(s).level
-    if (!names.includes(n)) names.push(n)
-  }
-  return names
-}
 
 export default function Profile() {
   const nav = useNavigate()
@@ -25,6 +16,8 @@ export default function Profile() {
   const [rank, setRank] = useState<number | null>(null)
   const [method, setMethod] = useState<string | null>(null)
   const [strength, setStrength] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [nameSaved, setNameSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -61,7 +54,7 @@ export default function Profile() {
 
         let { data: profile, error: pErr } = await supabase
           .from('profiles')
-          .select('stars, profile_visible')
+          .select('stars, profile_visible, display_name')
           .eq('id', user.id)
           .maybeSingle()
         if (pErr) throw new Error(`Could not read your profile: ${pErr.message}`)
@@ -71,7 +64,7 @@ export default function Profile() {
             .from('profiles')
             .insert({ id: user.id, stars: 0, profile_visible: false })
           if (insErr) throw new Error(`Could not create your profile: ${insErr.message}`)
-          profile = { stars: 0, profile_visible: false } as any
+          profile = { stars: 0, profile_visible: false, display_name: null } as any
         }
 
         const s = profile?.stars ?? 0
@@ -79,6 +72,7 @@ export default function Profile() {
         if (cancelled) return
         setStars(s)
         setVisible(isVisible)
+        setName(profile?.display_name ?? '')
         localStorage.setItem('stars', String(s))
         await loadRank(s, isVisible)
 
@@ -99,6 +93,19 @@ export default function Profile() {
     })()
     return () => { cancelled = true }
   }, [])
+
+  const saveName = async () => {
+    if (!userId) return
+    setError('')
+    setNameSaved(false)
+    const clean = name.trim().slice(0, 30)
+    const { error: nErr } = await supabase
+      .from('profiles')
+      .update({ display_name: clean })
+      .eq('id', userId)
+    if (nErr) setError(`Could not save your name: ${nErr.message}`)
+    else setNameSaved(true)
+  }
 
   const toggleVisible = async () => {
     if (!userId) return
@@ -124,7 +131,7 @@ export default function Profile() {
     nav('/auth')
   }
 
-  if (loading) return <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
+  if (loading) return <p className="muted">Loading your profile...</p>
 
   if (isGuest) {
     return (
@@ -143,10 +150,8 @@ export default function Profile() {
     )
   }
 
-  const lvl = getLevel(stars)
-  const ladder = buildLadder()
-  const levelNumber = Math.max(1, ladder.indexOf(lvl.level) + 1)
-  const initial = (email || 'T').charAt(0).toUpperCase()
+  const lvl = levelInfo(stars)
+  const initial = (name.trim() || email || 'T').charAt(0).toUpperCase()
 
   return (
     <div>
@@ -157,14 +162,10 @@ export default function Profile() {
 
       <Card>
         <div className="row" style={{ alignItems: 'center', gap: 14 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 14, background: 'var(--primary-dark)',
-            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, fontWeight: 700,
-          }}>{initial}</div>
+          <div className="avatar">{initial}</div>
           <div style={{ flex: 1 }}>
-            <h2 style={{ color: 'var(--text)' }}>{lvl.level}</h2>
-            <div className="muted">{email}</div>
+            <h2 style={{ color: 'var(--text)' }}>{name.trim() || 'Add your name below'}</h2>
+            <div className="muted">{lvl.name} · {email}</div>
           </div>
         </div>
 
@@ -174,7 +175,7 @@ export default function Profile() {
             <div className="muted">Stars</div>
           </div>
           <div style={{ textAlign: 'center', flex: 1 }}>
-            <h2>{levelNumber}</h2>
+            <h2>{lvl.level}</h2>
             <div className="muted">Level</div>
           </div>
           <div style={{ textAlign: 'center', flex: 1 }}>
@@ -184,27 +185,52 @@ export default function Profile() {
         </div>
 
         <p className="muted" style={{ marginTop: 14 }}>
+          {lvl.nextName
+            ? `${lvl.starsToNext} more stars to reach ${lvl.nextName}.`
+            : 'You have reached the highest level.'}
+        </p>
+
+        <div className="progress" style={{ marginTop: 8 }}>
+          <span style={{ width: `${lvl.progress}%` }} />
+        </div>
+      </Card>
+
+      <Card title="Your name">
+        <p className="muted" style={{ marginBottom: 10 }}>This is the name shown on the leaderboard.</p>
+        <div className="row-wrap" style={{ alignItems: 'center' }}>
+          <input
+            type="text"
+            maxLength={30}
+            placeholder="Enter your name"
+            value={name}
+            onChange={e => { setName(e.target.value); setNameSaved(false) }}
+            className="input"
+            style={{ flex: 1, minWidth: 180, margin: 0 }}
+          />
+          <Button onClick={saveName} disabled={!name.trim()}>Save name</Button>
+        </div>
+        {nameSaved ? <p style={{ color: 'var(--primary-dark)', marginTop: 8 }}>Name saved. It now shows on the leaderboard.</p> : null}
+      </Card>
+
+      <Card>
+        <p className="muted" style={{ marginBottom: 10 }}>
           {visible
             ? 'Your name and rank are public on the leaderboard.'
-            : 'You are not on the leaderboard. Turn on a public profile to see your rank.'}
+            : 'You are not on the leaderboard. Turn on a public profile to appear.'}
         </p>
-        <div style={{ marginTop: 10 }}>
-          <Button variant="secondary" onClick={toggleVisible} disabled={saving}>
-            {saving ? 'Saving...' : visible ? 'Hide my profile' : 'Show my profile on leaderboard'}
-          </Button>
-        </div>
+        <Button variant="secondary" onClick={toggleVisible} disabled={saving}>
+          {saving ? 'Saving...' : visible ? 'Hide my profile' : 'Show my profile on leaderboard'}
+        </Button>
       </Card>
 
       <Card title="Thinking profile summary">
         {method || strength ? (
-          <div style={{ background: '#f8fafc', borderRadius: 12, padding: 14 }}>
+          <div className="feedback">
             <p><strong>Primary strategy:</strong> {method || 'Not enough data yet'}</p>
-            <p style={{ marginTop: 6 }}><strong>Strength:</strong> {strength || 'Not enough data yet'}</p>
+            <p><strong>Strength:</strong> {strength || 'Not enough data yet'}</p>
           </div>
         ) : (
-          <p className="muted">
-            Not enough data yet. Complete a challenge or a test to build your thinking profile.
-          </p>
+          <p className="muted">Not enough data yet. Complete a challenge or a test to build your thinking profile.</p>
         )}
       </Card>
 
@@ -215,7 +241,9 @@ export default function Profile() {
           <Link to="/permissions" style={{ textDecoration: 'none' }}>
             <Button variant="secondary">Permissions &amp; privacy</Button>
           </Link>
-          <Link to="/leaderboard" style={{ textDecoration: 'none' }}><Button variant="secondary">View leaderboard</Button></Link>
+          <Link to="/leaderboard" style={{ textDecoration: 'none' }}>
+            <Button variant="secondary">View leaderboard</Button>
+          </Link>
           <Link to="/achievements" style={{ textDecoration: 'none' }}>
             <Button variant="secondary">Achievements &amp; badges</Button>
           </Link>

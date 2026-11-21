@@ -1006,3 +1006,30 @@ h1, h2, h3, h4, p, span, label, li, td, th, div {
 .btn, .btn:hover { color: #ffffff !important; }
 .btn-secondary { color: var(--primary-dark, var(--ink)) !important; }
 .btn-ghost { color: var(--ink) !important; }
+/* ===== Eye-comfort dark and clear contrast (master update) ===== */
+html[data-theme-dark="1"] {
+  --ink: #e9e6dd;
+  --ink-soft: #b0ab9f;
+  --surface: #1c1c24;
+  --surface-line: #34343f;
+}
+html[data-theme-dark="1"] body,
+html[data-theme-dark="1"] .page,
+html[data-theme-dark="1"] main {
+  background: #121218 !important;
+}
+html[data-theme-dark="1"] .card,
+html[data-theme-dark="1"] .settings-row,
+html[data-theme-dark="1"] .input,
+html[data-theme-dark="1"] .select {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border-color: var(--surface-line) !important;
+  box-shadow: none !important;
+}
+html[data-theme-dark="1"] .muted { color: var(--ink-soft) !important; }
+.seg, .tag, .btn-secondary {
+  letter-spacing: 0.01em;
+}
+/* Clear, separated accent colours for presets */
+.card-title, .section-title { letter-spacing: 0.01em; }

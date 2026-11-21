@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card } from '../components/ui'
 import { getUser, supabase } from '../lib/db'
-import { getLevel } from '../lib/scoring'
+import { levelInfo } from '../lib/levels'
 
 type Row = { id: string; display_name: string | null; stars: number }
 
@@ -17,7 +17,6 @@ export default function Leaderboard() {
       try {
         const user = await getUser()
         if (!cancelled) setMyId(user?.id ?? null)
-
         const { data, error: qErr } = await supabase
           .from('profiles')
           .select('id, display_name, stars')
@@ -35,8 +34,8 @@ export default function Leaderboard() {
     return () => { cancelled = true }
   }, [])
 
-  const nameOf = (r: Row, i: number) =>
-    r.display_name?.trim() || `Thinker ${i + 1}`
+  const displayName = (r: Row) => r.display_name?.trim() || 'Student (no name set)'
+  const initial = (r: Row) => (r.display_name?.trim() || 'S').charAt(0).toUpperCase()
 
   return (
     <div>
@@ -48,35 +47,36 @@ export default function Leaderboard() {
 
       <Card>
         {loading ? (
-          <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
+          <p className="muted">Loading...</p>
         ) : error ? (
           <p className="error-text">{error}</p>
         ) : rows.length === 0 ? (
           <p className="muted">
-            No public profiles yet. Sign in, open Profile, and tap "Show my profile on leaderboard" to appear here.
+            No public profiles yet. Sign in, open Profile, enter your name, and tap "Show my profile on leaderboard".
           </p>
         ) : (
           <div>
-            <div className="perm-row" style={{ fontWeight: 700, color: 'var(--primary-dark)' }}>
-              <span style={{ width: 40 }}>#</span>
+            <div className="table-head">
+              <span className="rank">#</span>
               <span style={{ flex: 1 }}>Student</span>
-              <span style={{ width: 90, textAlign: 'right' }}>Stars</span>
-              <span style={{ width: 170, textAlign: 'right' }}>Level</span>
+              <span className="stars">Stars</span>
+              <span className="level-col">Level</span>
             </div>
             {rows.map((r, i) => {
               const isMe = r.id === myId
               return (
-                <div
-                  key={r.id}
-                  className="perm-row"
-                  style={{ background: isMe ? '#f0fdfa' : 'transparent', borderRadius: 8 }}
-                >
-                  <span style={{ width: 40 }}>{i + 1}</span>
-                  <span style={{ flex: 1, fontWeight: isMe ? 700 : 400 }}>
-                    {nameOf(r, i)}{isMe ? ' (you)' : ''}
+                <div key={r.id} className={`table-row${isMe ? ' me' : ''}`}>
+                  <span className="rank">{i + 1}</span>
+                  <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span className="avatar" style={{ width: 34, height: 34, fontSize: 14, borderRadius: 10 }}>
+                      {initial(r)}
+                    </span>
+                    <span style={{ fontWeight: isMe ? 800 : 600 }}>
+                      {displayName(r)}{isMe ? ' (you)' : ''}
+                    </span>
                   </span>
-                  <span style={{ width: 90, textAlign: 'right' }}>{r.stars} ★</span>
-                  <span style={{ width: 170, textAlign: 'right' }}>{getLevel(r.stars).level}</span>
+                  <span className="stars">{r.stars} ★</span>
+                  <span className="level-col">{levelInfo(r.stars).name}</span>
                 </div>
               )
             })}
@@ -85,9 +85,7 @@ export default function Leaderboard() {
       </Card>
 
       <Card>
-        <p className="muted">
-          Guests can view this board. Sign in to appear on it.
-        </p>
+        <p className="muted">Guests can view this board. Sign in and show your profile to appear on it.</p>
       </Card>
     </div>
   )

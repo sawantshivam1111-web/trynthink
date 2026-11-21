@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import OfflineBanner from './OfflineBanner'
-import '../lib/themeEngine'
+import NamePrompt from '../screens/NamePrompt'
+import { getUser, supabase } from '../lib/db'
 
 const WIDTH = 240
 const WIDE = 768
@@ -10,12 +11,24 @@ const WIDE = 768
 export default function Layout() {
   const [wide, setWide] = useState(typeof window !== 'undefined' ? window.innerWidth >= WIDE : false)
   const [open, setOpen] = useState(false)
+  const [needsName, setNeedsName] = useState(false)
 
   useEffect(() => {
     const onResize = () => setWide(window.innerWidth >= WIDE)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  useEffect(() => {
+    (async () => {
+      const user = await getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+      if (!data?.display_name || !data.display_name.trim()) setNeedsName(true)
+    })()
+  }, [])
+
+  if (needsName) return <NamePrompt onDone={() => setNeedsName(false)} />
 
   if (!wide) {
     return (
@@ -45,7 +58,6 @@ export default function Layout() {
       >
         {open ? '‹' : '☰'}
       </button>
-
       <aside
         style={{
           position: 'fixed', top: 0, left: 0, bottom: 0, width: WIDTH,
@@ -57,13 +69,7 @@ export default function Layout() {
       >
         <BottomNav />
       </aside>
-
-      <main
-        style={{
-          marginLeft: open ? WIDTH : 0, transition: 'margin-left 0.25s',
-          padding: '60px 24px 24px',
-        }}
-      >
+      <main style={{ marginLeft: open ? WIDTH : 0, transition: 'margin-left 0.25s', padding: '60px 24px 24px' }}>
         <OfflineBanner />
         <Outlet />
       </main>
