@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Button } from '../components/ui'
 import ThemeStudio from '../components/ThemeStudio'
+import BadgeShelf from '../components/BadgeShelf'
 import { levelInfo } from '../lib/levels'
 import { getUser, supabase, signOut } from '../lib/db'
 
@@ -236,6 +237,7 @@ export default function Profile() {
 
       <ThemeStudio />
 
+      <BadgeShelf stars={stars} />
       <Card title="Account">
         <div className="row-wrap">
           <Link to="/permissions" style={{ textDecoration: 'none' }}>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button } from '../components/ui'
-import { levelInfo, LEVELS } from '../lib/levels'
+import { getLevel, LEVELS } from '../lib/levels'
 import { DependencyChart } from '../components/charts'
 import { getUser, supabase } from '../lib/db'
 import { calcDependency } from '../lib/dependency'
@@ -10,7 +10,7 @@ export default function Home() {
   const [stars, setStars] = useState(Number(localStorage.getItem('stars') || '0'))
   const [email, setEmail] = useState<string | null>(null)
   const [dep, setDep] = useState({ independent: 0, assisted: 0, dependent: 0 })
-  const lvl = levelInfo(stars)
+  const lvl = getLevel(stars)
 
   useEffect(() => {
     (async () => {

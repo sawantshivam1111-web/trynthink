@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card, Button } from '../components/ui'
-import { getLevel } from '../lib/scoring'
+import { getLevel } from '../lib/levels'
 
 const BADGES = [
   { name: 'First Thinker', icon: '🧠', desc: 'Complete your first thinking break or challenge.', unlocked: true },
