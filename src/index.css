@@ -969,3 +969,40 @@ p.muted:first-child {
 [style*="#0f766e"], [style*="#0b7a6b"], [style*="#1d4ed8"], [style*="#6d28d9"], [style*="#c2410c"], [style*="#10b981"] {
   color: var(--primary-dark, #0f766e);
 }
+/* ===== Contrast guard: text always readable on any theme ===== */
+:root { --ink: #1f2937; --ink-soft: #4b5563; --surface: #ffffff; --surface-line: #e5e7eb; }
+
+html[data-theme-dark="1"] {
+  --ink: #f8f5ee;
+  --ink-soft: #c9c4b8;
+  --surface: #171720;
+  --surface-line: #2e2e3a;
+}
+
+/* Text and surfaces read from the contrast tokens, everywhere */
+body, .page, main { color: var(--ink) !important; }
+.card, .pill-row, .kpi .pill, .settings-row, .segmented, .input, .select, .bubble-ai, .table-row, .empty-state, .feedback {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border-color: var(--surface-line) !important;
+}
+.card *, .card p, .card span, .card div, .card li, .card label, .settings-row span, .pill-row span {
+  color: inherit !important;
+}
+h1, h2, h3, h4, p, span, label, li, td, th, div {
+  color: inherit;
+}
+.muted, .table-head, .cert-label, .cert-stars, .empty-message, .kpi .pill span + span {
+  color: var(--ink-soft) !important;
+}
+.card-title, .section-title, .hero h1, .cert-level, .score, .timer, .rank, .stars {
+  color: var(--primary-dark, var(--ink)) !important;
+}
+.nav { background: var(--surface) !important; border-color: var(--surface-line) !important; }
+.nav a { color: var(--ink-soft) !important; }
+.nav a.active { color: var(--primary-dark, var(--ink)) !important; background: color-mix(in srgb, var(--primary, #0f9d8a) 14%, var(--surface)) !important; }
+
+/* Buttons keep readable text on their own gradient */
+.btn, .btn:hover { color: #ffffff !important; }
+.btn-secondary { color: var(--primary-dark, var(--ink)) !important; }
+.btn-ghost { color: var(--ink) !important; }

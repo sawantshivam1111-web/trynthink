@@ -29,7 +29,7 @@ export default function Profile() {
   const [error, setError] = useState('')
 
   const loadRank = async (s: number, isVisible: boolean) => {
-    if (!isVisible) {
+    if (!isVisible || s <= 0) {
       setRank(null)
       return
     }
@@ -215,6 +215,7 @@ export default function Profile() {
           <Link to="/permissions" style={{ textDecoration: 'none' }}>
             <Button variant="secondary">Permissions &amp; privacy</Button>
           </Link>
+          <Link to="/leaderboard" style={{ textDecoration: 'none' }}><Button variant="secondary">View leaderboard</Button></Link>
           <Link to="/achievements" style={{ textDecoration: 'none' }}>
             <Button variant="secondary">Achievements &amp; badges</Button>
           </Link>

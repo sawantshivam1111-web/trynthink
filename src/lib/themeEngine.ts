@@ -69,7 +69,7 @@ export function getCustom(): ThemeStyle | null {
 export function applyStyle(s: ThemeStyle) {
   const shadows = ['none', '0 1px 3px rgba(0,0,0,0.12)', '0 4px 12px rgba(0,0,0,0.16)', '0 10px 24px rgba(0,0,0,0.22)']
   const shadow = shadows[Math.round(s.shadow)] || 'none'
-  const dark = s.background === '#0f172a'
+  const dark = (() => { const c = s.background.replace('#',''); const r = parseInt(c.slice(0,2),16), g = parseInt(c.slice(2,4),16), b = parseInt(c.slice(4,6),16); return (0.2126*r + 0.7152*g + 0.0722*b) < 128 })()
   const root = document.documentElement.style
   root.setProperty('--theme-bg', s.background)
   root.setProperty('--theme-bg2', s.background)
