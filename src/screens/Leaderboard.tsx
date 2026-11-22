@@ -3,7 +3,7 @@ import { Card } from '../components/ui'
 import { getUser, supabase } from '../lib/db'
 import { levelInfo } from '../lib/levels'
 
-type Row = { id: string; display_name: string | null; stars: number }
+type Row = { id: string; name: string | null; avatar_url: string | null; stars: number }
 
 export default function Leaderboard() {
   const [rows, setRows] = useState<Row[]>([])
@@ -18,10 +18,8 @@ export default function Leaderboard() {
         const user = await getUser()
         if (!cancelled) setMyId(user?.id ?? null)
         const { data, error: qErr } = await supabase
-          .from('profiles')
-          .select('id, display_name, stars')
-          .eq('profile_visible', true)
-          .order('stars', { ascending: false })
+          .from('leaderboard_view')
+          .select('id, name, avatar_url, stars')
           .limit(50)
         if (qErr) throw qErr
         if (!cancelled) setRows((data as Row[]) || [])
@@ -33,9 +31,6 @@ export default function Leaderboard() {
     })()
     return () => { cancelled = true }
   }, [])
-
-  const displayName = (r: Row) => r.display_name?.trim() || 'Student (no name set)'
-  const initial = (r: Row) => (r.display_name?.trim() || 'S').charAt(0).toUpperCase()
 
   return (
     <div>
@@ -51,9 +46,7 @@ export default function Leaderboard() {
         ) : error ? (
           <p className="error-text">{error}</p>
         ) : rows.length === 0 ? (
-          <p className="muted">
-            No public profiles yet. Sign in, open Profile, enter your name, and tap "Show my profile on leaderboard".
-          </p>
+          <p className="muted">No public profiles yet. Sign in, open Profile, add your name, and tap "Show my profile on leaderboard".</p>
         ) : (
           <div>
             <div className="table-head">
@@ -68,12 +61,14 @@ export default function Leaderboard() {
                 <div key={r.id} className={`table-row${isMe ? ' me' : ''}`}>
                   <span className="rank">{i + 1}</span>
                   <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span className="avatar" style={{ width: 34, height: 34, fontSize: 14, borderRadius: 10 }}>
-                      {initial(r)}
-                    </span>
-                    <span style={{ fontWeight: isMe ? 800 : 600 }}>
-                      {displayName(r)}{isMe ? ' (you)' : ''}
-                    </span>
+                    {r.avatar_url ? (
+                      <img src={r.avatar_url} alt="" style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover' }} />
+                    ) : (
+                      <span className="avatar" style={{ width: 34, height: 34, fontSize: 14, borderRadius: 10 }}>
+                        {(r.name || 'S').charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span style={{ fontWeight: isMe ? 800 : 600 }}>{r.name || 'Student'}{isMe ? ' (you)' : ''}</span>
                   </span>
                   <span className="stars">{r.stars} ★</span>
                   <span className="level-col">{levelInfo(r.stars).name}</span>
