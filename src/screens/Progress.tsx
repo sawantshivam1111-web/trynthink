@@ -22,6 +22,11 @@ type Numbers = {
   focus_minutes: number
 }
 
+// A short fingerprint of the data behind a report. Same data gives the same fingerprint.
+function fingerprint(n: Numbers, latestAt: string | null) {
+  return [n.challenges, n.avg_thinking_score, n.tests, n.avg_test_pct, n.interview_answers, n.focus_minutes, latestAt ?? 'none'].join('|')
+}
+
 export default function Progress() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -30,6 +35,8 @@ export default function Progress() {
   const [numbers, setNumbers] = useState<Numbers | null>(null)
   const [report, setReport] = useState<Report | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [previous, setPrevious] = useState<Numbers | null>(null)
+  const [fresh, setFresh] = useState<boolean | null>(null)
 
   const methods = getReadyMethods()
 
@@ -37,16 +44,13 @@ export default function Progress() {
     (async () => {
       try {
         const user = await getUser()
-        if (!user) {
-          setSignedIn(false)
-          return
-        }
+        if (!user) { setSignedIn(false); return }
         const { data, error: qErr } = await supabase
           .from('thinking_reports')
           .select('summary, strengths, weaknesses, next_steps, stats, created_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(1)
+          .limit(2)
         if (qErr) throw qErr
         if (data && data[0]) {
           const r = data[0] as any
@@ -60,6 +64,7 @@ export default function Progress() {
           setNumbers(r.stats?.numbers || null)
           setSavedAt(r.created_at)
         }
+        if (data && data[1]) setPrevious((data[1] as any).stats?.numbers || null)
       } catch (e: any) {
         setError(e?.message || 'Could not load your progress.')
       } finally {
@@ -68,8 +73,7 @@ export default function Progress() {
     })()
   }, [])
 
-  const avg = (xs: number[]) =>
-    xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : null
+  const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : null)
 
   const generate = async () => {
     setBusy(true)
@@ -79,9 +83,9 @@ export default function Progress() {
       if (!user) throw new Error('Please sign in first.')
 
       const [resp, tests, answers, focus] = await Promise.all([
-        supabase.from('responses').select('thinking_score, ai_assist_level').eq('user_id', user.id).eq('submitted', true),
-        supabase.from('test_results').select('score').eq('user_id', user.id),
-        supabase.from('onboarding_answers').select('topic, question, answer').eq('user_id', user.id),
+        supabase.from('responses').select('thinking_score, ai_assist_level, created_at').eq('user_id', user.id).eq('submitted', true).order('created_at', { ascending: false }).limit(20),
+        supabase.from('test_results').select('score, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('onboarding_answers').select('topic, question, answer, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
         supabase.from('sessions').select('duration').eq('user_id', user.id).eq('type', 'timer'),
       ])
       if (resp.error) throw resp.error
@@ -112,26 +116,53 @@ export default function Progress() {
         throw new Error('No data yet. Complete a challenge, a test, the interview, or a focus session first.')
       }
 
-      const interview = a
-        .slice(0, 8)
-        .map((x, i) => `${i + 1}. (${x.topic}) ${x.question} -> ${x.answer}`)
-        .join('\n')
+      const latestAt = [r[0]?.created_at, t[0]?.created_at, a[0]?.created_at].filter(Boolean).sort().pop() || null
+      const fp = fingerprint(n, latestAt)
+
+      // If nothing changed since the last report, keep the same report (same method, same wording)
+      const { data: last } = await supabase
+        .from('thinking_reports')
+        .select('summary, strengths, weaknesses, next_steps, stats, created_at, data_fingerprint')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (last && (last as any).data_fingerprint === fp) {
+        setFresh(false)
+        setNumbers(n)
+        setReport({
+          summary: last.summary || '',
+          strengths: last.strengths || [],
+          weaknesses: last.weaknesses || [],
+          next_steps: last.next_steps || [],
+          suggested_method: (last as any).stats?.suggested_method || '',
+        })
+        setSavedAt(last.created_at)
+        return
+      }
+
+      const interview = a.slice(0, 6).map((x, i) => `${i + 1}. (${x.topic}) ${x.question} -> ${x.answer}`).join('\n')
+      const recentScores = scores.slice(0, 5).join(', ') || 'none'
+      const recentTests = t.slice(0, 5).map(x => x.score).join(', ') || 'none'
       const methodNames = methods.map(m => m.name).join(', ') || 'none'
 
-      const prompt = `Numbers about this student:
+      const prompt = `Numbers about this student (most recent data first):
 ${JSON.stringify(n)}
 
-Interview answers:
+Most recent thinking scores: ${recentScores}
+Most recent test scores: ${recentTests}
+
+Recent interview answers:
 ${interview || 'none'}
 
 Available study methods (use only these names): ${methodNames}
 
-Write the thinking pattern report as the JSON described. Mention focus time only if focus_minutes is above 0.`
+Base the report mainly on the most recent scores and answers. Mention what changed if the scores moved. Write the report as the JSON described.`
 
       const res = await callAI('report', prompt)
       const parsed = res.ok ? parseJSON<Report>(res.text) : null
       if (!parsed || !parsed.summary) {
-        throw new Error(res.ok ? 'The report could not be built. Press Refresh report again.' : `Server error: ${res.error}`)
+        throw new Error(res.ok ? 'The report could not be built. Tap Refresh report again.' : `Server error: ${res.error}`)
       }
 
       const clean: Report = {
@@ -149,12 +180,15 @@ Write the thinking pattern report as the JSON described. Mention focus time only
         weaknesses: clean.weaknesses,
         next_steps: clean.next_steps,
         stats: { numbers: n, suggested_method: clean.suggested_method },
+        data_fingerprint: fp,
       })
       if (insErr) setError(`Report built, but not saved: ${insErr.message}`)
 
+      setPrevious(numbers)
       setNumbers(n)
       setReport(clean)
       setSavedAt(new Date().toISOString())
+      setFresh(true)
     } catch (e: any) {
       setError(e?.message || 'Could not build the report.')
     } finally {
@@ -162,7 +196,7 @@ Write the thinking pattern report as the JSON described. Mention focus time only
     }
   }
 
-  if (loading) return <p className="muted"><span className="skeleton skeleton-line" aria-label="Loading" /></p>
+  if (loading) return <p className="muted">Loading your progress...</p>
 
   if (!signedIn) {
     return (
@@ -178,13 +212,22 @@ Write the thinking pattern report as the JSON described. Mention focus time only
 
   const suggested = methods.find(m => m.name === report?.suggested_method)
   const independentPct = numbers?.ai_assist_rate_pct != null ? 100 - numbers.ai_assist_rate_pct : null
+  const delta = (now: number | null | undefined, before: number | null | undefined) =>
+    now != null && before != null ? now - before : null
+  const scoreChange = delta(numbers?.avg_thinking_score, previous?.avg_thinking_score)
+  const testChange = delta(numbers?.avg_test_pct, previous?.avg_test_pct)
 
   return (
     <div>
       <div className="hero">
         <span className="tag">Progress</span>
         <h1 style={{ marginTop: 12 }}>Your thinking pattern report</h1>
-        <p className="muted">Built from your challenges, tests, interview answers, and focus sessions.</p>
+        <p className="muted">
+          {numbers
+            ? `Based on ${numbers.challenges} challenge${numbers.challenges === 1 ? '' : 's'}, ${numbers.tests} test${numbers.tests === 1 ? '' : 's'}, and ${numbers.interview_answers} interview answer${numbers.interview_answers === 1 ? '' : 's'}.`
+            : 'Built from your challenges, tests, interview answers, and focus sessions.'}
+        </p>
+        {fresh === false ? <p className="muted" style={{ marginTop: 6 }}>No new activity since the last report, so it's unchanged.</p> : null}
       </div>
 
       {numbers ? (
@@ -193,6 +236,7 @@ Write the thinking pattern report as the JSON described. Mention focus time only
             <div style={{ textAlign: 'center', flex: 1 }}>
               <h2>{numbers.avg_thinking_score ?? '–'}</h2>
               <div className="muted">Avg thinking score</div>
+              {scoreChange != null && scoreChange !== 0 ? <div className="muted" style={{ fontSize: 12 }}>{scoreChange > 0 ? '▲' : '▼'} {Math.abs(scoreChange)} since last report</div> : null}
             </div>
             <div style={{ textAlign: 'center', flex: 1 }}>
               <h2>{independentPct != null ? `${independentPct}%` : '–'}</h2>
@@ -201,6 +245,7 @@ Write the thinking pattern report as the JSON described. Mention focus time only
             <div style={{ textAlign: 'center', flex: 1 }}>
               <h2>{numbers.avg_test_pct != null ? `${numbers.avg_test_pct}%` : '–'}</h2>
               <div className="muted">Avg test score</div>
+              {testChange != null && testChange !== 0 ? <div className="muted" style={{ fontSize: 12 }}>{testChange > 0 ? '▲' : '▼'} {Math.abs(testChange)} since last report</div> : null}
             </div>
             <div style={{ textAlign: 'center', flex: 1 }}>
               <h2>{numbers.interview_answers}</h2>
@@ -218,37 +263,25 @@ Write the thinking pattern report as the JSON described. Mention focus time only
         <>
           <Card title="Summary">
             <p>{report.summary}</p>
-            {savedAt ? (
-              <p className="muted" style={{ marginTop: 8 }}>
-                Last updated {new Date(savedAt).toLocaleString()}
-              </p>
-            ) : null}
+            {savedAt ? <p className="muted" style={{ marginTop: 8 }}>Last updated {new Date(savedAt).toLocaleString()}</p> : null}
           </Card>
 
           <Card title="Strengths">
-            {report.strengths.length
-              ? report.strengths.map((s, i) => <p key={i}>• {s}</p>)
-              : <p className="muted">Not enough data yet.</p>}
+            {report.strengths.length ? report.strengths.map((s, i) => <p key={i}>• {s}</p>) : <p className="muted">Not enough data yet.</p>}
           </Card>
 
           <Card title="Areas to grow">
-            {report.weaknesses.length
-              ? report.weaknesses.map((s, i) => <p key={i}>• {s}</p>)
-              : <p className="muted">Not enough data yet.</p>}
+            {report.weaknesses.length ? report.weaknesses.map((s, i) => <p key={i}>• {s}</p>) : <p className="muted">Not enough data yet.</p>}
           </Card>
 
           <Card title="Next steps">
-            {report.next_steps.length
-              ? report.next_steps.map((s, i) => <p key={i}>{i + 1}. {s}</p>)
-              : <p className="muted">Not enough data yet.</p>}
+            {report.next_steps.length ? report.next_steps.map((s, i) => <p key={i}>{i + 1}. {s}</p>) : <p className="muted">Not enough data yet.</p>}
           </Card>
 
           {suggested ? (
             <Card title="Suggested study method">
               <p><strong>{suggested.name}</strong> from {suggested.source.university}</p>
-              <p className="muted" style={{ marginTop: 6 }}>
-                {suggested.source.title} ({suggested.source.year ?? 'year not set'})
-              </p>
+              <p className="muted" style={{ marginTop: 6 }}>{suggested.source.title} ({suggested.source.year ?? 'year not set'})</p>
               <p style={{ marginTop: 8 }}>
                 <a href={suggested.source.url} target="_blank" rel="noreferrer">Open the paper</a>
               </p>
@@ -257,16 +290,12 @@ Write the thinking pattern report as the JSON described. Mention focus time only
         </>
       ) : (
         <Card>
-          <p className="muted">
-            No report yet. Complete a challenge, a test, the interview, or a focus session, then generate your report.
-          </p>
+          <p className="muted">No report yet. Complete a challenge, a test, the interview, or a focus session, then generate your report.</p>
         </Card>
       )}
 
       <Card title="Research sources">
-        <p className="muted" style={{ marginBottom: 8 }}>
-          Verified papers behind the methods you can study with:
-        </p>
+        <p className="muted" style={{ marginBottom: 8 }}>Verified papers behind the methods you can study with:</p>
         {methods.length === 0 ? (
           <p className="muted">No verified sources are active yet.</p>
         ) : (
