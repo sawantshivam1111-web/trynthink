@@ -9,7 +9,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 // Reads the signed-in user from the browser's saved session (no network call).
-// Expired sessions are refreshed automatically by supabase-js.
 export async function getUser() {
   try {
     const { data } = await supabase.auth.getSession()

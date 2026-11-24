@@ -1,3 +1,4 @@
+import GuestSignInBar from './components/GuestSignInBar'
 import OnboardingGate from './components/OnboardingGate'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Auth from './screens/Auth'
@@ -25,6 +26,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <OnboardingGate />
+      <GuestSignInBar />
       <Routes>
         <Route path="/" element={<Navigate to="/auth" replace />} />
 
