@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Card, Button, Input } from '../components/ui'
-import { signIn, signUp } from '../lib/db'
+import { signIn, signUp, supabase } from '../lib/db'
 
 function friendly(message: string) {
   const m = message.toLowerCase()
@@ -12,7 +12,7 @@ function friendly(message: string) {
     return 'This email already has an account. Log in instead.'
   }
   if (m.includes('invalid login')) return 'Email or password is incorrect.'
-  if (m.includes('email not confirmed')) return 'Please confirm your email first. Check your inbox.'
+  if (m.includes('email not confirmed')) return 'NOT_CONFIRMED'
   return message
 }
 
@@ -22,6 +22,7 @@ export default function Auth() {
   const [mode, setMode] = useState<'login' | 'signup'>('signup')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [cooldown, setCooldown] = useState(0)
   const nav = useNavigate()
 
@@ -34,6 +35,7 @@ export default function Auth() {
   const submit = async () => {
     if (loading || cooldown > 0) return
     setError('')
+    setNotice('')
     const cleanEmail = email.trim().toLowerCase()
     if (!cleanEmail || !password) {
       setError('Please enter email and password')
@@ -51,7 +53,13 @@ export default function Auth() {
       if (res.error) {
         const wait = res.error.message.match(/(\d+)\s*seconds?/i)
         if (wait) setCooldown(Number(wait[1]))
-        setError(friendly(res.error.message))
+        const msg = friendly(res.error.message)
+        setError(msg === 'NOT_CONFIRMED'
+          ? 'Your account is not confirmed yet. Check your inbox and spam folder for the link, or resend it below.'
+          : msg)
+      } else if (mode === 'signup' && !res.data?.session) {
+        setNotice('Almost done! We sent a confirmation link to your email. Open it, then log in here.')
+        setMode('login')
       } else {
         nav('/permissions')
       }
@@ -62,12 +70,33 @@ export default function Auth() {
     }
   }
 
+  const resend = async () => {
+    if (loading || cooldown > 0) return
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail) {
+      setError('Enter your email above first.')
+      return
+    }
+    setLoading(true)
+    setError('')
+    const { error: rErr } = await supabase.auth.resend({ type: 'signup', email: cleanEmail })
+    setLoading(false)
+    if (rErr) {
+      const wait = rErr.message.match(/(\d+)\s*seconds?/i)
+      if (wait) setCooldown(Number(wait[1]))
+      setError(friendly(rErr.message))
+    } else {
+      setNotice('Confirmation email sent. Check your inbox and spam folder, then log in.')
+    }
+  }
+
   const busy = loading || cooldown > 0
   const buttonLabel = loading
     ? 'Please wait...'
     : cooldown > 0
       ? `Try again in ${cooldown}s`
       : mode === 'signup' ? 'Create Account' : 'Log In'
+  const needsConfirm = error.startsWith('Your account is not confirmed')
 
   return (
     <div className="auth-wrap">
@@ -100,21 +129,28 @@ export default function Auth() {
           </div>
         )}
 
-        {error ? <p className="error-text">{error}</p> : null}
+        {notice ? <p style={{ color: 'var(--primary-dark)', marginTop: 10 }}>{notice}</p> : null}
+        {error ? <p className="error-text" style={{ marginTop: 10 }}>{error}</p> : null}
 
         <div className="row-wrap" style={{ marginTop: 16 }}>
           <Button onClick={submit} disabled={busy}>{buttonLabel}</Button>
-          <Button variant="secondary" onClick={() => nav('/permissions')}>
-            Continue as Guest
-          </Button>
+          <Button variant="secondary" onClick={() => nav('/permissions')}>Continue as Guest</Button>
         </div>
+
+        {needsConfirm ? (
+          <div style={{ marginTop: 12 }}>
+            <Button variant="secondary" onClick={resend} disabled={busy}>
+              Resend confirmation email
+            </Button>
+          </div>
+        ) : null}
 
         <p className="muted" style={{ marginTop: 16, textAlign: 'center' }}>
           {mode === 'signup' ? 'Already have an account?' : 'Need an account?'}{' '}
           <button
             type="button"
             className="link-btn"
-            onClick={() => { setError(''); setMode(mode === 'signup' ? 'login' : 'signup') }}
+            onClick={() => { setError(''); setNotice(''); setMode(mode === 'signup' ? 'login' : 'signup') }}
           >
             {mode === 'signup' ? 'Log in here' : 'Create account'}
           </button>
